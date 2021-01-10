@@ -23,13 +23,13 @@ from collections import Counter
 # ftp://ftp.ncbi.nih.gov/blast/matrices/
 import nwalign3 as nw
 
-__author__ = "Your Name"
+__author__ = "Anis Fiddy"
 __copyright__ = "Universite Paris Diderot"
-__credits__ = ["Your Name"]
+__credits__ = ["Anis Fiddy"]
 __license__ = "GPL"
 __version__ = "1.0.0"
-__maintainer__ = "Your Name"
-__email__ = "your@email.fr"
+__maintainer__ = "Anis Fiddy"
+__email__ = "fiddyanis@eisti.eu"
 __status__ = "Developpement"
 
 
@@ -70,15 +70,39 @@ def get_arguments():
     return parser.parse_args()
 
 def read_fasta(amplicon_file, minseqlen):
-    pass
+    with gzip.open(amplicon_file, "rt") as f:
+        outp = ""
+        for line in f :
+            if line[0] == '>':
+                if len(outp) >= minseqlen:
+                    yield outp
+                outp = ""
+            else:
+                outp += line.strip()
+        yield outp
 
 
 def dereplication_fulllength(amplicon_file, minseqlen, mincount):
-    pass
+    f = read_fasta(amplicon_file, minseqlen)
+    dict_seqs = {}
+    for seq in f:
+        if seq in dict_seqs:
+            dict_seqs[seq] += 1
+        else:
+            dict_seqs[seq] = 1
+    
+    for seq, seqcount in sorted(dict_seqs.items(),key= lambda x:x[1], reverse=True):
+        if mincount <= seqcount:
+            yield [seq, seqcount]
+
 
 
 def get_chunks(sequence, chunk_size):
-    pass
+    chunks = []
+    while len(sequence)-chunk_size > 0:
+        chunks.append(sequence[:chunk_size])
+        sequence = sequence[chunk_size:]
+    return chunks
 
 def get_unique(ids):
     return {}.fromkeys(ids).keys()
@@ -88,13 +112,52 @@ def common(lst1, lst2):
     return list(set(lst1) & set(lst2))
 
 def cut_kmer(sequence, kmer_size):
-    pass
+    for i in range(len(sequence)+1-kmer_size):
+        yield(sequence[i:i+kmer_size])
 
 def get_identity(alignment_list):
+    cpt = 0
+    for i in range(len(alignment_list[0])):
+        if alignment_list[0][i] == alignment_list[1][i]:
+            cpt += 1
+    return 100* cpt/ len(alignment_list[0]) 
+
+    sm=difflib.SequenceMatcher(None,s1,s2)
+    return sm.ratio()
+
+def search_mates(kmer_dict, sequence, kmer_size):
+
+    all_mates = []
+    for kmer_elt in cut_kmer(sequence, kmer_size):
+
+        if kmer_elt in kmer_dict:
+            for i in Counter(kmer_dict[kmer_elt]).most_common(8):
+
+
+                all_mates.append(i[0])
+    return all_mates
+
+def get_unique_kmer(kmer_dict, sequence, id_seq, kmer_size):
+
+    for kmer_elt in cut_kmer(sequence, kmer_size):
+        if kmer_elt in kmer_dict.keys():
+            kmer_dict[kmer_elt].append(id_seq)
+
+
+        else:
+            kmer_dict[kmer_elt] = []
+            kmer_dict[kmer_elt].append(id_seq)
+
+        kmer_dict[kmer_elt].append(id_seq)
+    return kmer_dict
+
+def detect_chimera(perc_id_matrix):
     pass
+
 
 def chimera_removal(amplicon_file, minseqlen, mincount, chunk_size, kmer_size):
     pass
+
 
 def abundance_greedy_clustering(amplicon_file, minseqlen, mincount, chunk_size, kmer_size):
     pass
@@ -102,9 +165,17 @@ def abundance_greedy_clustering(amplicon_file, minseqlen, mincount, chunk_size, 
 def fill(text, width=80):
     """Split text with a line return to respect fasta format"""
     return os.linesep.join(text[i:i+width] for i in range(0, len(text), width))
+    cpt = 0
+    for i in range(len(alignment_list[0])):
+        if alignment_list[0][i] == alignment_list[1][i]:
+            cpt += 1
+    return 100* cpt/ len(alignment_list[0]) 
 
 def write_OTU(OTU_list, output_file):
-    pass
+    with open(output_file, "w") as output_file:
+        for i in range(0,len(OTU_list)):
+            output_file.write(">OTU_{} occurrence:{}\n".format(i+1,OTU_list[i][1]))
+            output_file.write(fill(OTU_list[i][0])+'\n')
 #==============================================================
 # Main program
 #==============================================================
@@ -112,7 +183,9 @@ def main():
     """
     Main program function
     """
-    # Get arguments
+
+
+
     args = get_arguments()
 
 
